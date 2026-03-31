@@ -241,47 +241,125 @@ export default function Index() {
       {/* ADMIN PANEL */}
       {isAdmin && (
         <section className="relative z-10 px-4 md:px-10 py-8 bg-[#1a0a0f] border-y border-[#ff2d78]/20">
-          <p className="text-[10px] tracking-[0.4em] uppercase text-[#ff2d78] mb-4">Панель администратора — добавить карточку</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Имя *</label>
-              <input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                placeholder="Sofia Rose" className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 placeholder:text-white/20 focus:outline-none focus:border-[#ff2d78]/50" />
-            </div>
-            <div>
-              <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Ссылка на профиль</label>
-              <input value={addForm.link} onChange={(e) => setAddForm({ ...addForm, link: e.target.value })}
-                placeholder="https://onlyfans.com/..." className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 placeholder:text-white/20 focus:outline-none focus:border-[#ff2d78]/50" />
-            </div>
-            <div>
-              <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Теги (через запятую)</label>
-              <input value={addForm.tags} onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })}
-                placeholder="фото, видео, эксклюзив" className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 placeholder:text-white/20 focus:outline-none focus:border-[#ff2d78]/50" />
-            </div>
-            <div>
-              <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Фото (обложка) *</label>
-              <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-              <button onClick={() => fileRef.current?.click()} disabled={uploadingPhoto}
-                className={`w-full flex items-center gap-2 border text-sm px-3 py-2 transition-colors ${addForm.preview ? "bg-green-900/20 border-green-500/30 text-green-400" : "bg-white/5 border-white/10 text-white/50 hover:border-white/30"}`}>
-                <Icon name={uploadingPhoto ? "Loader" : "Image"} size={14} className={uploadingPhoto ? "animate-spin" : ""} />
-                {uploadingPhoto ? "Загружаю..." : addForm.preview ? "Фото загружено ✓" : "Выбрать фото"}
+          <p className="text-[10px] tracking-[0.4em] uppercase text-[#ff2d78] mb-6">Панель администратора — добавить карточку</p>
+
+          {/* Скрытые инпуты */}
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+          <input ref={videoRef} type="file" accept="video/*" onChange={handleVideoChange} className="hidden" />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Левая колонка — поля */}
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Имя *</label>
+                <input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                  placeholder="Sofia Rose" className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2.5 placeholder:text-white/20 focus:outline-none focus:border-[#ff2d78]/50" />
+              </div>
+              <div>
+                <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Ссылка на профиль</label>
+                <input value={addForm.link} onChange={(e) => setAddForm({ ...addForm, link: e.target.value })}
+                  placeholder="https://onlyfans.com/..." className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2.5 placeholder:text-white/20 focus:outline-none focus:border-[#ff2d78]/50" />
+              </div>
+              <div>
+                <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Теги (через запятую)</label>
+                <input value={addForm.tags} onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })}
+                  placeholder="фото, видео, эксклюзив" className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2.5 placeholder:text-white/20 focus:outline-none focus:border-[#ff2d78]/50" />
+              </div>
+              <button onClick={handleAdd} disabled={adding || uploadingPhoto || uploadingVideo || !addForm.preview}
+                className="mt-2 flex items-center justify-center gap-2 px-6 py-3 bg-[#ff2d78] text-white text-sm font-semibold hover:bg-[#e0245f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <Icon name={adding ? "Loader" : "Plus"} size={16} className={adding ? "animate-spin" : ""} />
+                {adding ? "Сохраняю..." : uploadingPhoto || uploadingVideo ? "Дождитесь загрузки..." : !addForm.preview ? "Сначала загрузите фото" : "Добавить карточку"}
               </button>
             </div>
-            <div>
-              <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Видео (необязательно)</label>
-              <input ref={videoRef} type="file" accept="video/*" onChange={handleVideoChange} className="hidden" />
-              <button onClick={() => videoRef.current?.click()} disabled={uploadingVideo}
-                className={`w-full flex items-center gap-2 border text-sm px-3 py-2 transition-colors ${addForm.videoUrl ? "bg-green-900/20 border-green-500/30 text-green-400" : "bg-white/5 border-white/10 text-white/50 hover:border-white/30"}`}>
-                <Icon name={uploadingVideo ? "Loader" : "Video"} size={14} className={uploadingVideo ? "animate-spin" : ""} />
-                {uploadingVideo ? "Загружаю..." : addForm.videoUrl ? "Видео загружено ✓" : "Выбрать видео"}
-              </button>
+
+            {/* Правая колонка — вкладки загрузки */}
+            <div className="flex flex-col gap-3">
+              <p className="text-[9px] tracking-widest uppercase text-white/30">Медиафайлы</p>
+              <div className="flex gap-0 border border-white/10 overflow-hidden rounded-lg">
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className={`flex-1 flex flex-col items-center justify-center gap-3 py-8 transition-all border-r border-white/10 group ${
+                    addForm.preview
+                      ? "bg-green-900/20 hover:bg-green-900/30"
+                      : "bg-white/3 hover:bg-[#ff2d78]/10"
+                  }`}
+                >
+                  {uploadingPhoto ? (
+                    <Icon name="Loader" size={28} className="text-white/40 animate-spin" />
+                  ) : addForm.preview ? (
+                    <div className="relative">
+                      <img src={addForm.preview} className="w-16 h-16 object-cover rounded-lg" alt="preview" />
+                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                        <Icon name="Check" size={10} className="text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <Icon name="Image" size={28} className="text-white/20 group-hover:text-[#ff2d78] transition-colors" />
+                  )}
+                  <div className="text-center">
+                    <p className={`text-xs font-semibold ${addForm.preview ? "text-green-400" : "text-white/50 group-hover:text-white/80"} transition-colors`}>
+                      {uploadingPhoto ? "Загружаю..." : addForm.preview ? "Фото загружено" : "Нажми для фото"}
+                    </p>
+                    {!addForm.preview && !uploadingPhoto && (
+                      <p className="text-[10px] text-white/20 mt-0.5">JPG, PNG, WEBP</p>
+                    )}
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => videoRef.current?.click()}
+                  disabled={uploadingVideo}
+                  className={`flex-1 flex flex-col items-center justify-center gap-3 py-8 transition-all group ${
+                    addForm.videoUrl
+                      ? "bg-green-900/20 hover:bg-green-900/30"
+                      : "bg-white/3 hover:bg-[#ff2d78]/10"
+                  }`}
+                >
+                  {uploadingVideo ? (
+                    <Icon name="Loader" size={28} className="text-white/40 animate-spin" />
+                  ) : addForm.videoUrl ? (
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-lg bg-green-900/40 flex items-center justify-center">
+                        <Icon name="Play" size={24} className="text-green-400 ml-1" />
+                      </div>
+                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                        <Icon name="Check" size={10} className="text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <Icon name="Video" size={28} className="text-white/20 group-hover:text-[#ff2d78] transition-colors" />
+                  )}
+                  <div className="text-center">
+                    <p className={`text-xs font-semibold ${addForm.videoUrl ? "text-green-400" : "text-white/50 group-hover:text-white/80"} transition-colors`}>
+                      {uploadingVideo ? "Загружаю..." : addForm.videoUrl ? "Видео загружено" : "Нажми для видео"}
+                    </p>
+                    {!addForm.videoUrl && !uploadingVideo && (
+                      <p className="text-[10px] text-white/20 mt-0.5">MP4, MOV, необязательно</p>
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              {/* Превью */}
+              {(addForm.preview || addForm.videoUrl) && (
+                <div className="flex gap-2 mt-1">
+                  {addForm.preview && (
+                    <button onClick={() => setAddForm(f => ({ ...f, preview: "" }))}
+                      className="flex items-center gap-1.5 text-[10px] text-red-400/60 hover:text-red-400 transition-colors">
+                      <Icon name="X" size={12} /> Удалить фото
+                    </button>
+                  )}
+                  {addForm.videoUrl && (
+                    <button onClick={() => setAddForm(f => ({ ...f, videoUrl: "" }))}
+                      className="flex items-center gap-1.5 text-[10px] text-red-400/60 hover:text-red-400 transition-colors">
+                      <Icon name="X" size={12} /> Удалить видео
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-          <button onClick={handleAdd} disabled={adding || uploadingPhoto || uploadingVideo || !addForm.preview}
-            className="flex items-center gap-2 px-6 py-3 bg-[#ff2d78] text-white text-sm font-semibold hover:bg-[#e0245f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-            <Icon name={adding ? "Loader" : "Plus"} size={16} className={adding ? "animate-spin" : ""} />
-            {adding ? "Сохраняю..." : uploadingPhoto || uploadingVideo ? "Дождитесь загрузки файлов..." : "Добавить карточку"}
-          </button>
         </section>
       )}
 
