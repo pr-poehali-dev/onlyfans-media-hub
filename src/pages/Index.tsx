@@ -171,7 +171,7 @@ export default function Index() {
       </div>
 
       {/* GALLERY */}
-      <section id="gallery" className="px-6 md:px-16 py-24">
+      <section id="gallery" className="relative z-10 px-6 md:px-16 py-24">
         <div className="flex flex-col md:flex-row md:items-end gap-6 mb-16">
           <div>
             <p className="text-[10px] tracking-[0.5em] uppercase text-[#ff2d78] mb-2">Коллекция</p>
@@ -279,7 +279,7 @@ export default function Index() {
       </section>
 
       {/* CONTACTS */}
-      <section id="contacts" className="px-6 md:px-16 py-24 relative">
+      <section id="contacts" className="relative z-10 px-6 md:px-16 py-24">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full bg-[#ff2d78]/5 blur-[120px]" />
         </div>
