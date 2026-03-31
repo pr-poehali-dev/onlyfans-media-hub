@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 
 const WATERMARK = "Only Girl Web";
 const API = "https://functions.poehali.dev/8bc6c237-8ebf-482c-89ed-2252902d90f7";
+const UPLOAD_API = "https://functions.poehali.dev/7cbc42bc-42d8-47fc-8c96-994f118fd537";
 
 type Comment = { id: number; username: string; text: string; time: string };
 type MediaItem = {
@@ -35,6 +36,8 @@ export default function Index() {
 
   const [addForm, setAddForm] = useState({ name: "", link: "", tags: "", preview: "", videoUrl: "" });
   const [adding, setAdding] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
 
@@ -90,23 +93,45 @@ export default function Index() {
     } else { setPinError(true); }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setAddForm((f) => ({ ...f, preview: reader.result as string }));
-    reader.readAsDataURL(file);
+  const uploadFile = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const res = await fetch(UPLOAD_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: base64, name: file.name, type: file.type }),
+        });
+        const data = await res.json();
+        if (data.url) resolve(data.url);
+        else reject(new Error("Upload failed"));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
-  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
+    setUploadingPhoto(true);
+    const url = await uploadFile(file);
+    setAddForm((f) => ({ ...f, preview: url }));
+    setUploadingPhoto(false);
+  };
+
+  const handleVideoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingVideo(true);
+    const url = await uploadFile(file);
     setAddForm((f) => ({ ...f, videoUrl: url }));
+    setUploadingVideo(false);
   };
 
   const handleAdd = async () => {
-    if (!addForm.name.trim()) return;
+    if (!addForm.name.trim() || !addForm.preview) return;
     setAdding(true);
     const res = await fetch(API, {
       method: "POST",
@@ -114,7 +139,7 @@ export default function Index() {
       body: JSON.stringify({
         action: "add",
         name: addForm.name,
-        preview: addForm.preview || "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/41e15938-8e89-444c-a8a5-dda563a97c8d.jpg",
+        preview: addForm.preview,
         videoUrl: addForm.videoUrl || null,
         link: addForm.link || "#",
         tags: addForm.tags ? addForm.tags.split(",").map((t) => t.trim()).filter(Boolean) : ["новинка"],
@@ -234,28 +259,28 @@ export default function Index() {
                 placeholder="фото, видео, эксклюзив" className="w-full bg-white/5 border border-white/10 text-white text-sm px-3 py-2 placeholder:text-white/20 focus:outline-none focus:border-[#ff2d78]/50" />
             </div>
             <div>
-              <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Фото (обложка)</label>
+              <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Фото (обложка) *</label>
               <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-              <button onClick={() => fileRef.current?.click()}
-                className="w-full flex items-center gap-2 bg-white/5 border border-white/10 text-white/50 text-sm px-3 py-2 hover:border-white/30 transition-colors">
-                <Icon name="Image" size={14} />
-                {addForm.preview ? "Фото выбрано ✓" : "Выбрать фото"}
+              <button onClick={() => fileRef.current?.click()} disabled={uploadingPhoto}
+                className={`w-full flex items-center gap-2 border text-sm px-3 py-2 transition-colors ${addForm.preview ? "bg-green-900/20 border-green-500/30 text-green-400" : "bg-white/5 border-white/10 text-white/50 hover:border-white/30"}`}>
+                <Icon name={uploadingPhoto ? "Loader" : "Image"} size={14} className={uploadingPhoto ? "animate-spin" : ""} />
+                {uploadingPhoto ? "Загружаю..." : addForm.preview ? "Фото загружено ✓" : "Выбрать фото"}
               </button>
             </div>
             <div>
               <label className="text-[9px] tracking-widest uppercase text-white/30 block mb-1">Видео (необязательно)</label>
               <input ref={videoRef} type="file" accept="video/*" onChange={handleVideoChange} className="hidden" />
-              <button onClick={() => videoRef.current?.click()}
-                className="w-full flex items-center gap-2 bg-white/5 border border-white/10 text-white/50 text-sm px-3 py-2 hover:border-white/30 transition-colors">
-                <Icon name="Video" size={14} />
-                {addForm.videoUrl ? "Видео выбрано ✓" : "Выбрать видео"}
+              <button onClick={() => videoRef.current?.click()} disabled={uploadingVideo}
+                className={`w-full flex items-center gap-2 border text-sm px-3 py-2 transition-colors ${addForm.videoUrl ? "bg-green-900/20 border-green-500/30 text-green-400" : "bg-white/5 border-white/10 text-white/50 hover:border-white/30"}`}>
+                <Icon name={uploadingVideo ? "Loader" : "Video"} size={14} className={uploadingVideo ? "animate-spin" : ""} />
+                {uploadingVideo ? "Загружаю..." : addForm.videoUrl ? "Видео загружено ✓" : "Выбрать видео"}
               </button>
             </div>
           </div>
-          <button onClick={handleAdd} disabled={adding}
-            className="flex items-center gap-2 px-6 py-3 bg-[#ff2d78] text-white text-sm font-semibold hover:bg-[#e0245f] transition-colors disabled:opacity-50">
-            <Icon name={adding ? "Loader" : "Plus"} size={16} />
-            {adding ? "Сохраняю..." : "Добавить карточку"}
+          <button onClick={handleAdd} disabled={adding || uploadingPhoto || uploadingVideo || !addForm.preview}
+            className="flex items-center gap-2 px-6 py-3 bg-[#ff2d78] text-white text-sm font-semibold hover:bg-[#e0245f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <Icon name={adding ? "Loader" : "Plus"} size={16} className={adding ? "animate-spin" : ""} />
+            {adding ? "Сохраняю..." : uploadingPhoto || uploadingVideo ? "Дождитесь загрузки файлов..." : "Добавить карточку"}
           </button>
         </section>
       )}
