@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS t_p45610326_onlyfans_media_hub.cards (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  preview TEXT NOT NULL,
+  video_url TEXT,
+  link TEXT NOT NULL DEFAULT '#',
+  tags TEXT[] NOT NULL DEFAULT '{}',
+  likes INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)

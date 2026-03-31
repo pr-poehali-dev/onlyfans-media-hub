@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "GET cards list",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"cards": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

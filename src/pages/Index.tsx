@@ -1,15 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
 const WATERMARK = "Only Girl Web";
+const API = "https://functions.poehali.dev/8bc6c237-8ebf-482c-89ed-2252902d90f7";
 
-type Comment = { id: number; user: string; text: string; time: string };
+type Comment = { id: number; username: string; text: string; time: string };
 type MediaItem = {
   id: number;
   name: string;
-  avatar: string;
   preview: string;
-  videoUrl?: string;
+  videoUrl?: string | null;
   link: string;
   tags: string[];
   likes: number;
@@ -17,90 +17,68 @@ type MediaItem = {
   comments: Comment[];
 };
 
-const INITIAL_ITEMS: MediaItem[] = [
-  {
-    id: 1,
-    name: "Sofia Rose",
-    avatar: "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/41e15938-8e89-444c-a8a5-dda563a97c8d.jpg",
-    preview: "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/41e15938-8e89-444c-a8a5-dda563a97c8d.jpg",
-    link: "https://onlyfans.com",
-    tags: ["фото", "lifestyle"],
-    likes: 142,
-    likedByMe: false,
-    comments: [{ id: 1, user: "user123", text: "Огонь!", time: "2 ч назад" }],
-  },
-  {
-    id: 2,
-    name: "Mia Belle",
-    avatar: "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/45c7770a-ed4f-465e-9e68-08e0428eadfd.jpg",
-    preview: "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/45c7770a-ed4f-465e-9e68-08e0428eadfd.jpg",
-    link: "https://onlyfans.com",
-    tags: ["видео", "эксклюзив"],
-    likes: 98,
-    likedByMe: false,
-    comments: [],
-  },
-  {
-    id: 3,
-    name: "Lara Nova",
-    avatar: "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/b32ad28f-4c59-4c3a-9762-f36a443d47e0.jpg",
-    preview: "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/b32ad28f-4c59-4c3a-9762-f36a443d47e0.jpg",
-    link: "https://onlyfans.com",
-    tags: ["фото", "новинка"],
-    likes: 217,
-    likedByMe: false,
-    comments: [{ id: 1, user: "fan99", text: "Лучшая!", time: "5 ч назад" }],
-  },
-];
-
 const ADMIN_PIN = "1234";
 
 export default function Index() {
-  const [items, setItems] = useState<MediaItem[]>(INITIAL_ITEMS);
+  const [items, setItems] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [openCard, setOpenCard] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
   const [userName, setUserName] = useState("");
   const [filterTag, setFilterTag] = useState("все");
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Admin
   const [adminOpen, setAdminOpen] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Add form
-  const [addForm, setAddForm] = useState({
-    name: "", link: "", tags: "", preview: "", videoUrl: "",
-  });
+  const [addForm, setAddForm] = useState({ name: "", link: "", tags: "", preview: "", videoUrl: "" });
+  const [adding, setAdding] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
 
-  const allTags = ["все", ...Array.from(new Set(items.flatMap((i) => i.tags)))];
-  const filtered = filterTag === "все" ? items : items.filter((i) => i.tags.includes(filterTag));
-
-  const toggleLike = (id: number) => {
-    setItems((prev) => prev.map((item) =>
-      item.id === id
-        ? { ...item, likedByMe: !item.likedByMe, likes: item.likedByMe ? item.likes - 1 : item.likes + 1 }
-        : item
-    ));
+  const fetchCards = async () => {
+    setLoading(true);
+    const res = await fetch(API);
+    const data = await res.json();
+    const parsed = (data.cards || []).map((c: MediaItem) => ({ ...c, likedByMe: false }));
+    setItems(parsed);
+    setLoading(false);
   };
 
-  const addComment = (id: number) => {
+  useEffect(() => { fetchCards(); }, []);
+
+  const allTags = ["все", ...Array.from(new Set(items.flatMap((i) => i.tags)))];
+  const filtered = filterTag === "все" ? items : items.filter((i) => i.tags.includes(filterTag));
+  const activeItem = items.find((i) => i.id === openCard);
+
+  const toggleLike = async (id: number) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    const liked = !item.likedByMe;
+    setItems((prev) => prev.map((i) =>
+      i.id === id ? { ...i, likedByMe: liked, likes: liked ? i.likes + 1 : i.likes - 1 } : i
+    ));
+    await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "like", card_id: id, liked }),
+    });
+  };
+
+  const addComment = async (id: number) => {
     if (!commentText.trim()) return;
-    const name = userName.trim() || "Гость";
+    const username = userName.trim() || "Гость";
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "comment", card_id: id, username, text: commentText.trim() }),
+    });
+    const data = await res.json();
     setItems((prev) => prev.map((item) =>
       item.id === id
-        ? {
-            ...item,
-            comments: [...item.comments, {
-              id: Date.now(),
-              user: name,
-              text: commentText.trim(),
-              time: "только что",
-            }],
-          }
+        ? { ...item, comments: [...item.comments, { id: data.id, username, text: commentText.trim(), time: data.time }] }
         : item
     ));
     setCommentText("");
@@ -108,20 +86,16 @@ export default function Index() {
 
   const handleLogin = () => {
     if (pinInput === ADMIN_PIN) {
-      setIsAdmin(true);
-      setAdminOpen(false);
-      setPinInput("");
-      setPinError(false);
-    } else {
-      setPinError(true);
-    }
+      setIsAdmin(true); setAdminOpen(false); setPinInput(""); setPinError(false);
+    } else { setPinError(true); }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAddForm((f) => ({ ...f, preview: url }));
+    const reader = new FileReader();
+    reader.onload = () => setAddForm((f) => ({ ...f, preview: reader.result as string }));
+    reader.readAsDataURL(file);
   };
 
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,25 +105,29 @@ export default function Index() {
     setAddForm((f) => ({ ...f, videoUrl: url }));
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!addForm.name.trim()) return;
-    const newItem: MediaItem = {
-      id: Date.now(),
-      name: addForm.name,
-      avatar: addForm.preview || "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/41e15938-8e89-444c-a8a5-dda563a97c8d.jpg",
-      preview: addForm.preview || "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/41e15938-8e89-444c-a8a5-dda563a97c8d.jpg",
-      videoUrl: addForm.videoUrl || undefined,
-      link: addForm.link || "#",
-      tags: addForm.tags ? addForm.tags.split(",").map((t) => t.trim()).filter(Boolean) : ["новинка"],
-      likes: 0,
-      likedByMe: false,
-      comments: [],
-    };
-    setItems((prev) => [newItem, ...prev]);
+    setAdding(true);
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "add",
+        name: addForm.name,
+        preview: addForm.preview || "https://cdn.poehali.dev/projects/562a4356-3eb2-4c32-8743-6f6d827f0a24/files/41e15938-8e89-444c-a8a5-dda563a97c8d.jpg",
+        videoUrl: addForm.videoUrl || null,
+        link: addForm.link || "#",
+        tags: addForm.tags ? addForm.tags.split(",").map((t) => t.trim()).filter(Boolean) : ["новинка"],
+      }),
+    });
+    await res.json();
+    await fetchCards();
     setAddForm({ name: "", link: "", tags: "", preview: "", videoUrl: "" });
+    setAdding(false);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
+    await fetch(`${API}?id=${id}`, { method: "DELETE" });
     setItems((prev) => prev.filter((i) => i.id !== id));
     if (openCard === id) setOpenCard(null);
   };
@@ -159,14 +137,12 @@ export default function Index() {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = img.width; canvas.height = img.height;
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
       ctx.font = `bold ${Math.max(img.width / 12, 28)}px Arial`;
       ctx.fillStyle = "rgba(255,255,255,0.45)";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate(-Math.PI / 6);
@@ -180,26 +156,21 @@ export default function Index() {
     img.src = item.preview;
   };
 
-  const activeItem = items.find((i) => i.id === openCard);
-
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden" style={{ fontFamily: "'Montserrat', sans-serif" }}>
 
       {/* NAV */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-10 py-4 bg-[#0d0d0d]/90 backdrop-blur-md border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <span className="text-[#ff2d78] font-black text-xl tracking-tight">Only</span>
-          <span className="text-white font-black text-xl tracking-tight">Girl</span>
-          <span className="text-[#ff2d78] font-black text-xl tracking-tight">Web</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[#ff2d78] font-black text-xl">Only</span>
+          <span className="text-white font-black text-xl">Girl</span>
+          <span className="text-[#ff2d78] font-black text-xl">Web</span>
         </div>
         <div className="flex items-center gap-4">
           {isAdmin ? (
             <span className="text-[10px] tracking-widest uppercase text-[#ff2d78] border border-[#ff2d78]/30 px-3 py-1">ADMIN</span>
           ) : (
-            <button
-              onClick={() => setAdminOpen(true)}
-              className="text-[10px] tracking-widest uppercase text-white/30 hover:text-white/70 transition-colors"
-            >
+            <button onClick={() => setAdminOpen(true)} className="text-[10px] tracking-widest uppercase text-white/30 hover:text-white/70 transition-colors">
               Войти
             </button>
           )}
@@ -209,14 +180,12 @@ export default function Index() {
         </div>
       </nav>
 
-      {/* MOBILE MENU */}
       {menuOpen && (
         <div className="fixed inset-0 z-40 bg-[#0d0d0d] flex flex-col items-center justify-center gap-8">
           {[{ label: "Главная", href: "#top" }, { label: "Каталог", href: "#catalog" }].map((item) => (
             <a key={item.label} href={item.href}
               className="text-3xl font-bold text-white hover:text-[#ff2d78] transition-colors"
-              onClick={() => setMenuOpen(false)}
-            >{item.label}</a>
+              onClick={() => setMenuOpen(false)}>{item.label}</a>
           ))}
         </div>
       )}
@@ -229,7 +198,7 @@ export default function Index() {
         </div>
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ff2d78]/10 border border-[#ff2d78]/20 mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#ff2d78] animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff2d78]" style={{ animation: "pulse 2s infinite" }} />
             <span className="text-[10px] tracking-[0.3em] uppercase text-[#ff2d78]">Эксклюзивный контент</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black leading-tight text-white mb-4">
@@ -239,8 +208,7 @@ export default function Index() {
             Лучшие девушки OnlyFans и не только — фото, видео, ссылки на профили
           </p>
           <a href="#catalog" className="inline-flex items-center gap-2 px-6 py-3 bg-[#ff2d78] text-white text-sm font-semibold tracking-wide hover:bg-[#e0245f] transition-colors">
-            Смотреть каталог
-            <Icon name="ArrowRight" size={16} />
+            Смотреть каталог <Icon name="ArrowRight" size={16} />
           </a>
         </div>
       </section>
@@ -284,10 +252,10 @@ export default function Index() {
               </button>
             </div>
           </div>
-          <button onClick={handleAdd}
-            className="flex items-center gap-2 px-6 py-3 bg-[#ff2d78] text-white text-sm font-semibold hover:bg-[#e0245f] transition-colors">
-            <Icon name="Plus" size={16} />
-            Добавить карточку
+          <button onClick={handleAdd} disabled={adding}
+            className="flex items-center gap-2 px-6 py-3 bg-[#ff2d78] text-white text-sm font-semibold hover:bg-[#e0245f] transition-colors disabled:opacity-50">
+            <Icon name={adding ? "Loader" : "Plus"} size={16} />
+            {adding ? "Сохраняю..." : "Добавить карточку"}
           </button>
         </section>
       )}
@@ -308,60 +276,69 @@ export default function Index() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filtered.map((item) => (
-            <div key={item.id} className="group relative bg-[#161616] rounded-xl overflow-hidden border border-white/5 hover:border-[#ff2d78]/30 transition-all duration-300">
-              {/* Preview */}
-              <div className="relative aspect-[3/4] overflow-hidden cursor-pointer" onClick={() => setOpenCard(item.id)}>
-                <img src={item.preview} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                {item.videoUrl && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur flex items-center justify-center">
-                      <Icon name="Play" size={20} className="text-white ml-1" />
+        {loading ? (
+          <div className="flex items-center justify-center py-24 gap-3 text-white/30">
+            <Icon name="Loader" size={20} className="animate-spin" />
+            <span className="text-sm">Загрузка...</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-24 gap-3">
+            <Icon name="ImageOff" size={36} className="text-white/10" />
+            <p className="text-white/20 text-sm tracking-widest uppercase">Карточек пока нет</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filtered.map((item) => (
+              <div key={item.id} className="group relative bg-[#161616] rounded-xl overflow-hidden border border-white/5 hover:border-[#ff2d78]/30 transition-all duration-300">
+                <div className="relative aspect-[3/4] overflow-hidden cursor-pointer" onClick={() => setOpenCard(item.id)}>
+                  <img src={item.preview} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  {item.videoUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur flex items-center justify-center">
+                        <Icon name="Play" size={20} className="text-white ml-1" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <p className="font-bold text-white text-sm truncate">{item.name}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {item.tags.slice(0, 2).map((t) => (
+                        <span key={t} className="text-[9px] px-2 py-0.5 rounded-full bg-[#ff2d78]/20 text-[#ff2d78] tracking-wide">{t}</span>
+                      ))}
                     </div>
                   </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                <div className="absolute bottom-3 left-3 right-3">
-                  <p className="font-bold text-white text-sm truncate">{item.name}</p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {item.tags.slice(0, 2).map((t) => (
-                      <span key={t} className="text-[9px] px-2 py-0.5 rounded-full bg-[#ff2d78]/20 text-[#ff2d78] tracking-wide">{t}</span>
-                    ))}
-                  </div>
+                  {isAdmin && (
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Icon name="Trash2" size={12} className="text-white" />
+                    </button>
+                  )}
                 </div>
-                {isAdmin && (
-                  <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Icon name="Trash2" size={12} className="text-white" />
+                <div className="px-3 py-2.5 flex items-center justify-between gap-2">
+                  <button onClick={() => toggleLike(item.id)}
+                    className={`flex items-center gap-1.5 text-xs transition-colors ${item.likedByMe ? "text-[#ff2d78]" : "text-white/40 hover:text-[#ff2d78]"}`}>
+                    <Icon name="Heart" size={15} />
+                    <span>{item.likes}</span>
                   </button>
-                )}
+                  <button onClick={() => setOpenCard(openCard === item.id ? null : item.id)}
+                    className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors">
+                    <Icon name="MessageCircle" size={15} />
+                    <span>{item.comments.length}</span>
+                  </button>
+                  <button onClick={() => handleDownload(item)}
+                    className="flex items-center gap-1 text-xs text-white/40 hover:text-[#00e5ff] transition-colors">
+                    <Icon name="Download" size={15} />
+                  </button>
+                  <a href={item.link} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-white/40 hover:text-[#ff2d78] transition-colors">
+                    <Icon name="ExternalLink" size={15} />
+                  </a>
+                </div>
               </div>
-
-              {/* Actions */}
-              <div className="px-3 py-2.5 flex items-center justify-between gap-2">
-                <button onClick={() => toggleLike(item.id)}
-                  className={`flex items-center gap-1.5 text-xs transition-colors ${item.likedByMe ? "text-[#ff2d78]" : "text-white/40 hover:text-[#ff2d78]"}`}>
-                  <Icon name={item.likedByMe ? "Heart" : "Heart"} size={15} />
-                  <span>{item.likes}</span>
-                </button>
-                <button onClick={() => setOpenCard(openCard === item.id ? null : item.id)}
-                  className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors">
-                  <Icon name="MessageCircle" size={15} />
-                  <span>{item.comments.length}</span>
-                </button>
-                <button onClick={() => handleDownload(item)}
-                  className="flex items-center gap-1 text-xs text-white/40 hover:text-[#00e5ff] transition-colors">
-                  <Icon name="Download" size={15} />
-                </button>
-                <a href={item.link} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-white/40 hover:text-[#ff2d78] transition-colors">
-                  <Icon name="ExternalLink" size={15} />
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* MODAL */}
@@ -373,8 +350,6 @@ export default function Index() {
               className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/60 hover:text-white">
               <Icon name="X" size={16} />
             </button>
-
-            {/* Media */}
             <div className="relative">
               {activeItem.videoUrl ? (
                 <video src={activeItem.videoUrl} controls className="w-full max-h-64 object-cover bg-black" />
@@ -382,34 +357,26 @@ export default function Index() {
                 <img src={activeItem.preview} alt={activeItem.name} className="w-full max-h-72 object-cover" />
               )}
               <div className="absolute bottom-3 left-3 right-12 flex items-center justify-between">
-                <span className="font-bold text-white text-lg">{activeItem.name}</span>
+                <span className="font-bold text-white text-lg drop-shadow">{activeItem.name}</span>
                 <a href={activeItem.link} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-[#ff2d78] text-white text-xs font-semibold rounded-full hover:bg-[#e0245f] transition-colors">
-                  <Icon name="ExternalLink" size={12} />
-                  Профиль
+                  <Icon name="ExternalLink" size={12} /> Профиль
                 </a>
               </div>
             </div>
-
-            {/* Actions bar */}
             <div className="flex items-center gap-4 px-4 py-3 border-b border-white/5">
               <button onClick={() => toggleLike(activeItem.id)}
                 className={`flex items-center gap-1.5 text-sm font-semibold transition-colors ${activeItem.likedByMe ? "text-[#ff2d78]" : "text-white/50 hover:text-[#ff2d78]"}`}>
-                <Icon name="Heart" size={18} />
-                {activeItem.likes}
+                <Icon name="Heart" size={18} /> {activeItem.likes}
               </button>
               <span className="flex items-center gap-1.5 text-sm text-white/40">
-                <Icon name="MessageCircle" size={18} />
-                {activeItem.comments.length}
+                <Icon name="MessageCircle" size={18} /> {activeItem.comments.length}
               </span>
               <button onClick={() => handleDownload(activeItem)}
                 className="ml-auto flex items-center gap-1.5 text-xs text-white/40 hover:text-[#00e5ff] transition-colors border border-white/10 px-3 py-1.5 rounded-full hover:border-[#00e5ff]/40">
-                <Icon name="Download" size={14} />
-                Скачать с водяным знаком
+                <Icon name="Download" size={14} /> Скачать с водяным знаком
               </button>
             </div>
-
-            {/* Comments */}
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
               {activeItem.comments.length === 0 && (
                 <p className="text-white/20 text-sm text-center py-4">Комментариев пока нет</p>
@@ -417,11 +384,11 @@ export default function Index() {
               {activeItem.comments.map((c) => (
                 <div key={c.id} className="flex gap-3">
                   <div className="w-7 h-7 rounded-full bg-[#ff2d78]/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] text-[#ff2d78] font-bold">{c.user[0].toUpperCase()}</span>
+                    <span className="text-[10px] text-[#ff2d78] font-bold">{c.username[0].toUpperCase()}</span>
                   </div>
                   <div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-semibold text-white/80">{c.user}</span>
+                      <span className="text-xs font-semibold text-white/80">{c.username}</span>
                       <span className="text-[10px] text-white/20">{c.time}</span>
                     </div>
                     <p className="text-sm text-white/60 mt-0.5">{c.text}</p>
@@ -429,8 +396,6 @@ export default function Index() {
                 </div>
               ))}
             </div>
-
-            {/* Add comment */}
             <div className="px-4 py-3 border-t border-white/5 flex flex-col gap-2">
               <input value={userName} onChange={(e) => setUserName(e.target.value)}
                 placeholder="Ваш никнейм (необязательно)"
@@ -450,7 +415,7 @@ export default function Index() {
         </div>
       )}
 
-      {/* ADMIN LOGIN MODAL */}
+      {/* ADMIN LOGIN */}
       {adminOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setAdminOpen(false)}>
           <div className="bg-[#161616] border border-white/10 rounded-2xl p-8 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
@@ -469,7 +434,6 @@ export default function Index() {
         </div>
       )}
 
-      {/* FOOTER */}
       <footer className="border-t border-white/5 px-4 md:px-10 py-6 flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-1">
           <span className="text-[#ff2d78] font-black">Only</span>
