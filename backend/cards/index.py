@@ -26,11 +26,11 @@ def handler(event: dict, context) -> dict:
     try:
         if method == "GET":
             cur.execute(f"""
-                SELECT c.id, c.name, c.preview, c.video_url, c.link, c.tags, c.likes, c.created_at,
+                SELECT c.id, c.name, c.preview, c.video_url, c.link, c.tags, c.likes,
                     COALESCE(json_agg(
                         json_build_object('id', cm.id, 'username', cm.username, 'text', cm.text, 'time', to_char(cm.created_at, 'DD.MM.YYYY HH24:MI'))
                         ORDER BY cm.created_at
-                    ) FILTER (WHERE cm.id IS NOT NULL), '[]') AS comments
+                    ) FILTER (WHERE cm.id IS NOT NULL), '[]'::json) AS comments
                 FROM {SCHEMA}.cards c
                 LEFT JOIN {SCHEMA}.comments cm ON cm.card_id = c.id
                 GROUP BY c.id
@@ -39,10 +39,13 @@ def handler(event: dict, context) -> dict:
             rows = cur.fetchall()
             cards = []
             for r in rows:
+                comments = r[7]
+                if isinstance(comments, str):
+                    comments = json.loads(comments)
                 cards.append({
                     "id": r[0], "name": r[1], "preview": r[2],
                     "videoUrl": r[3], "link": r[4], "tags": list(r[5]),
-                    "likes": r[6], "comments": r[7] if isinstance(r[7], list) else json.loads(r[7]),
+                    "likes": r[6], "comments": comments or [],
                 })
             return {"statusCode": 200, "headers": cors, "body": json.dumps({"cards": cards})}
 

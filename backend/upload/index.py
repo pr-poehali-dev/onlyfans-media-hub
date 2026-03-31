@@ -1,12 +1,25 @@
 import base64
 import json
-import mimetypes
 import os
 import uuid
 
 import boto3
 
 ACCESS_KEY = os.environ["AWS_ACCESS_KEY_ID"]
+
+MIME_TO_EXT = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/heic": ".heic",
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "video/x-msvideo": ".avi",
+    "video/webm": ".webm",
+    "video/mpeg": ".mpeg",
+}
 
 
 def handler(event: dict, context) -> dict:
@@ -20,9 +33,8 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": cors, "body": ""}
 
     body = json.loads(event.get("body") or "{}")
-    file_data = body.get("file")       # base64 строка
-    file_name = body.get("name", "file.jpg")
-    file_type = body.get("type", "image/jpeg")  # MIME-тип
+    file_data = body.get("file")
+    file_type = body.get("type", "image/jpeg").lower()
 
     if not file_data:
         return {"statusCode": 400, "headers": cors, "body": json.dumps({"error": "no file"})}
@@ -32,10 +44,7 @@ def handler(event: dict, context) -> dict:
         file_data = file_data.split(",", 1)[1]
     raw = base64.b64decode(file_data)
 
-    # Определяем расширение
-    ext = mimetypes.guess_extension(file_type) or ".bin"
-    if ext == ".jpe":
-        ext = ".jpg"
+    ext = MIME_TO_EXT.get(file_type, ".jpg")
     key = f"onlygirl/{uuid.uuid4().hex}{ext}"
 
     s3 = boto3.client(
